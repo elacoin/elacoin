@@ -878,23 +878,46 @@ double GetDifficulty2(const CBlockIndex* blockindex)
 
 int64 static GetBlockValue(int nHeight, int64 nFees)
 {
-	
 	int64 diff;
+        int64 nSubsidy;
 
-	if(nHeight < 2){
+	if(nHeight < 2) {
 		diff = 1;
 	} else {
 		diff = GetDifficulty2(FindBlockByHeight(nHeight-1));
 	}
 	
-    int64 nSubsidy = ((1 + (diff / 24)) * COIN) / (1 + (nHeight / 194400));
-    // Elacoin: 194k blocks in ~9 months
+    //orig elacoin diff/24 but floor()'d by implicit int math makes diff 24 = 1coin, diff 25=2.
+    // want smooth progression of reward - mat5x
+    //int64 nSubsidy = ((1 + (diff / 24)) * COIN) / (1 + (nHeight / 194400));
 
+    // Elacoin: 194k blocks in ~9 months (270 days @ 2 min/block)
+    //do our multiplication by elatoshi's COIN base first to avoid int() flooring
+    // have to divide by reward scaling interval (194400) first tho to avoid overflowing int64
+    // still gives relatively smooth scaling for diffs > 0.1 - mat5x
+
+
+    if (nHeight < 17820) { 	// keep original subsidy formula for prefork blocks - mat5x
+        nSubsidy  = ((1 + (diff / 24)) * COIN) / (1 + (nHeight / 194400));
+        return nSubsidy + nFees;
+    }
+
+    if (nHeight < 18360) { 
+       nSubsidy = COIN;			// block value of 1 ELC (COIN elatoshis) til network stabilizes after fork until 8.5 * 2160 blocks - mat5x
+       return nSubsidy + nFees;
+    }
+
+    if (diff < 1 && nHeight >= 18360) 
+        diff = 1;		// elacoin minimum diff = 1 base consideration for block reward, then scale factor on top - mat5x
+   
+    nSubsidy = diff*COIN;			// this many elatoshis for you (base before scale factor) - mat5x
+    nSubsidy = nSubsidy / (194400 + nHeight);   // divide down so we dont blow int64 in the future - mat5x
+    nSubsidy = nSubsidy * 194400;               // mulply it back up to achieve scaling factor on 270d periods - mat5x
     return nSubsidy + nFees;
 }
 
 static const int64 nTargetTimespan = 3 * 24 * 60 * 60; // Elacoin: 3 days
-static const int64 nTargetSpacing = 2 * 60; // Elacoin: 2.5 minutes
+static const int64 nTargetSpacing = 2 * 60; // Elacoin: 2.5 minutes - no, 2 minutes - mat5x
 static const int64 nInterval = nTargetTimespan / nTargetSpacing;
 
 //
@@ -926,12 +949,35 @@ unsigned int static GetNextWorkRequired(const CBlockIndex* pindexLast, const CBl
 {
     unsigned int nProofOfWorkLimit = bnProofOfWorkLimit.GetCompact();
 
+    int64 maxRetargMult = 4;	// maximum retarg multiplier/divider - mat5x
+    int64 nHeight = pindexLast->nHeight+1;	// keep nHeight handy - mat5x
+
+    int64 forkBlockNum = 17820;		// block # for the fix fork - mat5x
+
+    int64 nInterval2       = nInterval;		// original default interval, modify below for retargeting for fixfork -- mat5x
+    int64 nTargetTimespan2 = nTargetTimespan;	// original default timespan between retargs, mod below for fixfork -- mat5x
+
+    if (nHeight >= forkBlockNum && nHeight < 19440)
+    {
+        nInterval2       = nInterval /4;	// retarget every 2160/4 blocks between #17280 & #19440 for fixfork -- mat5x
+	nTargetTimespan2 = nTargetTimespan / 4; // also need to change targetTimeSpan -- mat5x
+    }
+ 
+    if (nHeight == forkBlockNum || nHeight == forkBlockNum + 270) {		// immediate and early retargetting at 8.25 and 8.375 * 2160 block interval - mat5x
+      maxRetargMult    = 16;			// diff retarg scale factor made higher for fix fork - mat5x
+      nInterval2       = nInterval/16;		// look back 1/16th of normal interval (2160/16) for retarg of diff to capture actual recent hashrate - mat5x
+      nTargetTimespan2 = nTargetTimespan/16;	// timespan should be 1/16th too of course - mat5x
+    }
+
+    if (nHeight >= 18360 && nHeight <= 18900)  // for this range,
+      maxRetargMult = 8;		      // reduce factor a bit after 2160/4 blocks before dropping to regular *4 /4 - mat5x
+
     // Genesis block
     if (pindexLast == NULL)
         return nProofOfWorkLimit;
 
-    // Only change once per interval
-    if ((pindexLast->nHeight+1) % nInterval != 0)
+    // Only change once per interval - unless fork start block
+    if ((pindexLast->nHeight+1) % nInterval2 != 0 && nHeight != forkBlockNum && nHeight != forkBlockNum + 270)	// retarg at forkBlockNum and forkBlockNum + 270 and intervals
     {
         // Special difficulty rule for testnet:
         if (fTestNet)
@@ -955,11 +1001,11 @@ unsigned int static GetNextWorkRequired(const CBlockIndex* pindexLast, const CBl
 
     // Elacoin: This fixes an issue where a 51% attack can change difficulty at will.
     // Go back the full period unless it's the first retarget after genesis. Code courtesy of Art Forz
-    int blockstogoback = nInterval-1;
-    if ((pindexLast->nHeight+1) != nInterval)
-        blockstogoback = nInterval;
+    int blockstogoback = nInterval2-1;
+    if ((pindexLast->nHeight+1) != nInterval2)
+        blockstogoback = nInterval2;
 
-    // Go back by what we want to be 14 days worth of blocks
+    // Go back by what we want to be 14 days worth of blocks -- elacoin -- mat5x: no, 3 days, 2160 blocks.
     const CBlockIndex* pindexFirst = pindexLast;
     for (int i = 0; pindexFirst && i < blockstogoback; i++)
         pindexFirst = pindexFirst->pprev;
@@ -968,23 +1014,23 @@ unsigned int static GetNextWorkRequired(const CBlockIndex* pindexLast, const CBl
     // Limit adjustment step
     int64 nActualTimespan = pindexLast->GetBlockTime() - pindexFirst->GetBlockTime();
     printf("  nActualTimespan = %"PRI64d"  before bounds\n", nActualTimespan);
-    if (nActualTimespan < nTargetTimespan/4)
-        nActualTimespan = nTargetTimespan/4;
-    if (nActualTimespan > nTargetTimespan*4)
-        nActualTimespan = nTargetTimespan*4;
+    if (nActualTimespan < nTargetTimespan2 / maxRetargMult)				// - mat5x 
+        nActualTimespan = nTargetTimespan2 / maxRetargMult;				// - mat5x 
+    if (nActualTimespan > nTargetTimespan2 * maxRetargMult)				// - mat5x 
+        nActualTimespan = nTargetTimespan2 * maxRetargMult;				// - mat5x 
 
     // Retarget
     CBigNum bnNew;
     bnNew.SetCompact(pindexLast->nBits);
     bnNew *= nActualTimespan;
-    bnNew /= nTargetTimespan;
+    bnNew /= nTargetTimespan2;
 
     if (bnNew > bnProofOfWorkLimit)
         bnNew = bnProofOfWorkLimit;
 
     /// debug print
     printf("GetNextWorkRequired RETARGET\n");
-    printf("nTargetTimespan = %"PRI64d"    nActualTimespan = %"PRI64d"\n", nTargetTimespan, nActualTimespan);
+    printf("nTargetTimespan = %"PRI64d"    nActualTimespan = %"PRI64d"\n", nTargetTimespan2, nActualTimespan);
     printf("Before: %08x  %s\n", pindexLast->nBits, CBigNum().SetCompact(pindexLast->nBits).getuint256().ToString().c_str());
     printf("After:  %08x  %s\n", bnNew.GetCompact(), bnNew.getuint256().ToString().c_str());
 
@@ -2882,7 +2928,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         CBlock block;
         vRecv >> block;
 
-        printf("received block %s\n", block.GetHash().ToString().substr(0,20).c_str());
+        printf("received block %s from %s\n", block.GetHash().ToString().substr(0,20).c_str(), pfrom->addr.ToString().c_str());
         // block.print();
 
         CInv inv(MSG_BLOCK, block.GetHash());
