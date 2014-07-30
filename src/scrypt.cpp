@@ -32,6 +32,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <openssl/sha.h>
+#include "util.h"
 
 static inline uint32_t be32dec(const void *pp)
 {
@@ -49,21 +50,7 @@ static inline void be32enc(void *pp, uint32_t x)
 	p[0] = (x >> 24) & 0xff;
 }
 
-static inline uint32_t le32dec(const void *pp)
-{
-	const uint8_t *p = (uint8_t const *)pp;
-	return ((uint32_t)(p[0]) + ((uint32_t)(p[1]) << 8) +
-	    ((uint32_t)(p[2]) << 16) + ((uint32_t)(p[3]) << 24));
-}
 
-static inline void le32enc(void *pp, uint32_t x)
-{
-	uint8_t *p = (uint8_t *)pp;
-	p[0] = x & 0xff;
-	p[1] = (x >> 8) & 0xff;
-	p[2] = (x >> 16) & 0xff;
-	p[3] = (x >> 24) & 0xff;
-}
 
 
 typedef struct HMAC_SHA256Context {
@@ -77,7 +64,7 @@ HMAC_SHA256_Init(HMAC_SHA256_CTX *ctx, const void *_K, size_t Klen)
 {
 	unsigned char pad[64];
 	unsigned char khash[32];
-	const unsigned char *K = _K;
+	const unsigned char *K = (const unsigned char *)_K;
 	size_t i;
 
 	/* If Klen > 64, the key is really SHA256(K). */
@@ -139,7 +126,7 @@ HMAC_SHA256_Final(unsigned char digest[32], HMAC_SHA256_CTX *ctx)
  * Compute PBKDF2(passwd, salt, c, dkLen) using HMAC-SHA256 as the PRF, and
  * write the output to buf.  The value dkLen must be at most 32 * (2^32 - 1).
  */
-static void
+void
 PBKDF2_SHA256(const uint8_t *passwd, size_t passwdlen, const uint8_t *salt,
     size_t saltlen, uint64_t c, uint8_t *buf, size_t dkLen)
 {
@@ -260,12 +247,12 @@ static inline void xor_salsa8(uint32_t B[16], const uint32_t Bx[16])
 	B[15] += x15;
 }
 
-void scrypt_1024_1_1_256_sp(const char *input, char *output, char *scratchpad)
+void scrypt_N_1_1_256_sp_generic(const char *input, char *output, char *scratchpad, unsigned char Nfactor)
 {
 	uint8_t B[128];
 	uint32_t X[32];
 	uint32_t *V;
-	uint32_t i, j, k;
+	uint32_t i, j, k, N;
 
 	V = (uint32_t *)(((uintptr_t)(scratchpad) + 63) & ~ (uintptr_t)(63));
 	
@@ -274,13 +261,14 @@ void scrypt_1024_1_1_256_sp(const char *input, char *output, char *scratchpad)
 	for (k = 0; k < 32; k++)
 		X[k] = le32dec(&B[4 * k]);
 
-	for (i = 0; i < 1024; i++) {
+	N = (1 << (Nfactor + 1));
+	for (i = 0; i < N; i++) {
 		memcpy(&V[i * 32], X, 128);
 		xor_salsa8(&X[0], &X[16]);
 		xor_salsa8(&X[16], &X[0]);
 	}
-	for (i = 0; i < 1024; i++) {
-		j = 32 * (X[16] & 1023);
+	for (i = 0; i < N; i++) {
+		j = 32 * (X[16] & (N-1));
 		for (k = 0; k < 32; k++)
 			X[k] ^= V[j + k];
 		xor_salsa8(&X[0], &X[16]);
@@ -293,8 +281,30 @@ void scrypt_1024_1_1_256_sp(const char *input, char *output, char *scratchpad)
 	PBKDF2_SHA256((const uint8_t *)input, 80, B, 128, 1, (uint8_t *)output, 32);
 }
 
-void scrypt_1024_1_1_256(const char *input, char *output)
+#if defined(USE_SSE2)
+/* Detect SSE2 */
+void (*scrypt_N_1_1_256_sp)(const char *input, char *output, char *scratchpad, unsigned char Nfactor);
+void scrypt_detect_sse2(unsigned int cpuid_edx)
 {
-	char scratchpad[SCRYPT_SCRATCHPAD_SIZE];
-	scrypt_1024_1_1_256_sp(input, output, scratchpad);
+    if (cpuid_edx & 1<<26)
+    {
+        scrypt_N_1_1_256_sp = &scrypt_N_1_1_256_sp_sse2;
+        printf("scrypt: using scrypt-sse2 as detected.\n");
+    }
+    else
+    {
+        scrypt_N_1_1_256_sp = &scrypt_N_1_1_256_sp_generic;
+        printf("scrypt: using scrypt-generic, SSE2 unavailable.\n");
+    }
+}
+#endif
+
+void scrypt_N_1_1_256(const char *input, char *output, unsigned char Nfactor)
+{
+    char scratchpad[((1 << (Nfactor + 1)) * 128 ) + 63];
+#if defined(USE_SSE2)
+    scrypt_N_1_1_256_sp(input, output, scratchpad, Nfactor);
+#else
+    scrypt_N_1_1_256_sp_generic(input, output, scratchpad, Nfactor);
+#endif
 }

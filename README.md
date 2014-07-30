@@ -1,3 +1,5 @@
+!!! WARNING: This is WIP code - do not use !!!
+
 Elacoin - an elastic cryptocurrency
 
 Development process
