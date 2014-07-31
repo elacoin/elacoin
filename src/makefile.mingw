@@ -15,17 +15,17 @@ LIBPATHS= \
  -L"C:\openssl-1.0.1b-mgw"
 
 LIBS= \
- -l boost_system-mgw45-mt-s-1_49 \
- -l boost_filesystem-mgw45-mt-s-1_49 \
- -l boost_program_options-mgw45-mt-s-1_49 \
- -l boost_thread-mgw45-mt-s-1_49 \
+ -l boost_system-mgw48-mt-s-1_55 \
+ -l boost_filesystem-mgw48-mt-s-1_55 \
+ -l boost_program_options-mgw48-mt-s-1_55 \
+ -l boost_thread-mgw48-mt-s-1_55 \
  -l db_cxx \
  -l ssl \
  -l crypto
 
-DEFS=-DWIN32 -D_WINDOWS -DBOOST_THREAD_USE_LIB -DBOOST_SPIRIT_THREADSAFE -DUSE_IPV6
+DEFS=-DWIN32 -D_WINDOWS -DBOOST_THREAD_USE_LIB -DBOOST_SPIRIT_THREADSAFE -DUSE_IPV6 -DUSE_SSE2 -D_FORTIFY_SOURCE=2
 DEBUGFLAGS=-g
-CFLAGS=-mthreads -O2 -w -Wall -Wextra -Wformat -Wformat-security -Wno-unused-parameter $(DEBUGFLAGS) $(DEFS) $(INCLUDEPATHS)
+CFLAGS=-mthreads -O2 -w -Wall -Wextra -Wformat -Wformat-security -Wno-unused-parameter -msse2 -mstackrealign -Wl,--dynamicbase -Wl,--nxcompat -Wl,--large-address-aware -static-libgcc -static-libstdc++ $(DEBUGFLAGS) $(DEFS) $(INCLUDEPATHS)
 
 TESTDEFS = -DTEST_DATA_DIR=$(abspath test/data)
 
@@ -57,10 +57,12 @@ OBJS= \
     obj/protocol.o \
     obj/bitcoinrpc.o \
     obj/rpcdump.o \
+    obj/rpcalert.o \
     obj/rpcnet.o \
     obj/rpcrawtransaction.o \
     obj/script.o \
     obj/scrypt.o \
+    obj/scrypt-sse2.o \
     obj/sync.o \
     obj/util.o \
     obj/wallet.o \
@@ -69,9 +71,6 @@ OBJS= \
 
 
 all: elacoind.exe
-
-obj/scrypt.o: scrypt.c
-	gcc -c $(CFLAGS) -o $@ $^
 
 obj/%.o: %.cpp $(HEADERS)
 	g++ -c $(CFLAGS) -o $@ $<
