@@ -1,9 +1,15 @@
 TEMPLATE = app
-TARGET =
+TARGET = Elacoin-Qt
 VERSION = 0.6.3
 INCLUDEPATH += src src/json src/qt
-DEFINES += QT_GUI BOOST_THREAD_USE_LIB BOOST_SPIRIT_THREADSAFE USE_IPV6
+QT += core gui network
+greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
+DEFINES += QT_GUI BOOST_THREAD_USE_LIB BOOST_SPIRIT_THREADSAFE USE_IPV6 USE_SSE2
+DEFINES += STATIC
+DEFINES += QT_STATIC_BUILD
 CONFIG += no_include_pwd
+CONFIG += thread
+CONFIG += static
 
 # for boost 1.37, add -mt to the boost libraries
 # use: qmake BOOST_LIB_SUFFIX=-mt
@@ -87,6 +93,14 @@ macx: {
     QMAKE_LFLAGS += -fstack-protector
     # do not enable this on windows, as it will result in a non-working executable!
 }
+# for extra security (see: https://wiki.debian.org/Hardening): this flag is GCC compiler-specific
+QMAKE_CXXFLAGS *= -D_FORTIFY_SOURCE=2 -msse2 -mstackrealign
+# for extra security on Windows: enable ASLR and DEP via GCC linker flags
+win32:QMAKE_LFLAGS *= -Wl,--dynamicbase -Wl,--nxcompat
+# on Windows: enable GCC large address aware linker flag
+win32:QMAKE_LFLAGS *= -Wl,--large-address-aware
+# i686-w64-mingw32
+win32:QMAKE_LFLAGS *= -static-libgcc -static-libstdc++
 
 # regenerate src/build.h
 !windows|contains(USE_BUILD_INFO, 1) {
@@ -217,6 +231,7 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/bitcoinrpc.cpp \
     src/rpcdump.cpp \
     src/rpcnet.cpp \
+    src/rpcalert.cpp \
     src/rpcrawtransaction.cpp \
     src/qt/overviewpage.cpp \
     src/qt/csvmodelwriter.cpp \
@@ -230,7 +245,8 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/qt/notificator.cpp \
     src/qt/qtipcserver.cpp \
     src/qt/rpcconsole.cpp \
-    src/scrypt.c \
+    src/scrypt.cpp \
+    src/scrypt-sse2.cpp \
     src/qt/miningpage.cpp \
     src/noui.cpp
 
@@ -294,7 +310,7 @@ OTHER_FILES += \
 # platform specific defaults, if not overridden on command line
 isEmpty(BOOST_LIB_SUFFIX) {
     macx:BOOST_LIB_SUFFIX = -mt
-    windows:BOOST_LIB_SUFFIX = -mgw44-mt-s-1_49
+    windows:BOOST_LIB_SUFFIX = -mgw48-mt-s-1_55
 }
 
 isEmpty(BOOST_THREAD_LIB_SUFFIX) {

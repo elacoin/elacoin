@@ -1,31 +1,20 @@
-!!! WARNING: This is WIP code - do not use !!!
-
 Elacoin - an elastic cryptocurrency
+===================================
 
-Development process
-===================
+Hardfork Notice: Elacoin will switch to Scrypt-N Adaptive and KGW at August 15th, 2014 00:00:00 GMT!
 
-Developers work in their own trees, then submit pull requests when
-they think their feature or bug fix is ready.
+Elastic block reward algorithm based on the difficulty and Moore's Law
+The more computational power you throw at it, the more each block will give. 
+The reward is halved every nine months to preserve the coin's value.
 
-The patch will be accepted if there is broad consensus that it is a
-good thing.  Developers should expect to rework and resubmit patches
-if they don't match the project's coding conventions (see coding.txt)
-or are controversial.
+Stable Currency that Regulates Itself Through Supply and Demand
+Less demand? Less hashpower, less block reward, less supply. Same value.
+High demand? More hashpower, more block reward, more supply. Same value.
 
-The master branch is regularly built and tested, but is not guaranteed
-to be completely stable. Tags are regularly created to indicate new
-official, stable release versions of Elacoin.
+Fast Payments and Confirmations
+The block target is one every 2 minutes, which is the perfect amount.
+Fast enough without running into network IO limits, or bloating your hard drive.
 
-Feature branches are created when there are major new features being
-worked on by several people.
-
-From time to time a pull request will become outdated. If this occurs, and
-the pull is no longer automatically mergeable; a comment on the pull will
-be used to issue a warning of closure. The pull will be closed 15 days
-after the warning if action is not taken by the author. Pull requests closed
-in this manner will have their corresponding issue labeled 'stagnant'.
-
-Issues with no commits will be given a similar warning, and closed after
-15 days from their last activity. Issues closed in this manner will be 
-labeled 'stale'. 
+Open to everyone. No premining, no shenanigans, announced release
+Elacoin will be released after 24 hours of this message. Elacoin is not premined,
+with the genesis block timestamping "Traffic from Syria Disappears from Internet".

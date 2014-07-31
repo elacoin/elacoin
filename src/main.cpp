@@ -2143,7 +2143,7 @@ static unsigned int nCurrentBlockFile = 1;
 FILE* AppendBlockFile(unsigned int& nFileRet)
 {
     nFileRet = 0;
-    loop
+    ccloop
     {
         FILE* file = OpenBlockFile(nCurrentBlockFile, 0, "ab");
         if (!file)
@@ -2227,7 +2227,7 @@ bool LoadBlockIndex(bool fAllowNew)
             unsigned long int scrypt_scratpad_size_current_block = ((1 << (GetNfactor(block.nTime) + 1)) * 128 ) + 63;            
             char scratchpad[scrypt_scratpad_size_current_block];
 
-            loop
+            ccloop
             {
                 scrypt_N_1_1_256_sp(BEGIN(block.nVersion), BEGIN(thash), scratchpad, GetNfactor(block.nTime));
                 if (thash <= hashTarget)
@@ -3170,7 +3170,7 @@ bool ProcessMessages(CNode* pfrom)
     //  (x) data
     //
 
-    loop
+    ccloop
     {
         // Don't bother if send buffer is too full to respond anyway
         if (pfrom->vSend.size() >= SendBufferSize())
@@ -3919,7 +3919,7 @@ void static BitcoinMiner(CWallet *pwallet)
         //
         int64 nStart = GetTime();
         uint256 hashTarget = CBigNum().SetCompact(pblock->nBits).getuint256();
-        loop
+        ccloop
         {
             unsigned int nHashesDone = 0;
             //unsigned int nNonceFound;
@@ -3927,7 +3927,7 @@ void static BitcoinMiner(CWallet *pwallet)
             uint256 thash;
             unsigned long int scrypt_scratpad_size_current_block = ((1 << (GetNfactor(pblock->nTime) + 1)) * 128 ) + 63;
             char scratchpad[scrypt_scratpad_size_current_block];
-            loop
+            ccloop
             {
                 scrypt_N_1_1_256_sp(BEGIN(pblock->nVersion), BEGIN(thash), scratchpad, GetNfactor(pblock->nTime));
 

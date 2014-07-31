@@ -109,6 +109,7 @@ OBJS= \
     obj/protocol.o \
     obj/bitcoinrpc.o \
     obj/rpcdump.o \
+    obj/rpcalert.o \
     obj/rpcnet.o \
     obj/rpcrawtransaction.o \
     obj/script.o \
