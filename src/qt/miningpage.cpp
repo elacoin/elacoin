@@ -1,6 +1,10 @@
 #include "miningpage.h"
 #include "ui_miningpage.h"
 
+#if QT_VERSION >= 0x050000
+#define toAscii toLatin1
+#endif
+
 MiningPage::MiningPage(QWidget *parent) :
     QWidget(parent),
     ui(new Ui::MiningPage)
@@ -179,13 +183,13 @@ void MiningPage::readProcessOutput()
             else if (line.contains("LONGPOLL detected new block"))
                 reportToList("LONGPOLL detected a new block", LONGPOLL, getTime(line));
             else if (line.contains("Supported options:"))
-                reportToList("Miner didn't start properly. Try checking your settings.", ERROR, NULL);
+                reportToList("Miner didn't start properly. Try checking your settings.", CCMP_ERROR, NULL);
             else if (line.contains("The requested URL returned error: 403"))
-                reportToList("Couldn't connect. Please check your username and password.", ERROR, NULL);
+                reportToList("Couldn't connect. Please check your username and password.", CCMP_ERROR, NULL);
             else if (line.contains("HTTP request failed"))
-                reportToList("Couldn't connect. Please check pool server and port.", ERROR, NULL);
+                reportToList("Couldn't connect. Please check pool server and port.", CCMP_ERROR, NULL);
             else if (line.contains("JSON-RPC call failed"))
-                reportToList("Couldn't communicate with server. Retrying in 30 seconds.", ERROR, NULL);
+                reportToList("Couldn't communicate with server. Retrying in 30 seconds.", CCMP_ERROR, NULL);
             else if (line.contains("thread ") && line.contains("khash/s"))
             {
                 QString threadIDstr = line.at(line.indexOf("thread ")+7);
@@ -212,16 +216,16 @@ void MiningPage::minerError(QProcess::ProcessError error)
 {
     if (error == QProcess::FailedToStart)
     {
-        reportToList("Miner failed to start. Make sure you have the minerd executable and libraries in the same directory as Elacoin-Qt.", ERROR, NULL);
+        reportToList("Miner failed to start. Make sure you have the minerd executable and libraries in the same directory as Elacoin-Qt.", CCMP_ERROR, NULL);
     }
 }
 
 void MiningPage::minerFinished()
 {
     if (getMiningType() == ClientModel::SoloMining)
-        reportToList("Solo mining stopped.", ERROR, NULL);
+        reportToList("Solo mining stopped.", CCMP_ERROR, NULL);
     else
-        reportToList("Miner exited.", ERROR, NULL);
+        reportToList("Miner exited.", CCMP_ERROR, NULL);
     ui->list->addItem("");
     minerActive = false;
     resetMiningButton();
@@ -232,7 +236,7 @@ void MiningPage::minerStarted()
 {
     if (!minerActive)
         if (getMiningType() == ClientModel::SoloMining)
-            reportToList("Solo mining started.", ERROR, NULL);
+            reportToList("Solo mining started.", CCMP_ERROR, NULL);
         else
             reportToList("Miner started. You might not see any output for a few minutes.", STARTED, NULL);
     minerActive = true;

@@ -4,7 +4,7 @@
 
 USE_UPNP:=-
 
-DEFS=-DUSE_IPV6 -DBOOST_SPIRIT_THREADSAFE
+DEFS=-DUSE_IPV6 -DBOOST_SPIRIT_THREADSAFE -DUSE_SSE2
 
 DEFS += $(addprefix -I,$(CURDIR) $(CURDIR)/obj $(BOOST_INCLUDE_PATH) $(BDB_INCLUDE_PATH) $(OPENSSL_INCLUDE_PATH))
 LIBS = $(addprefix -L,$(BOOST_LIB_PATH) $(BDB_LIB_PATH) $(OPENSSL_LIB_PATH))
@@ -109,10 +109,12 @@ OBJS= \
     obj/protocol.o \
     obj/bitcoinrpc.o \
     obj/rpcdump.o \
+    obj/rpcalert.o \
     obj/rpcnet.o \
     obj/rpcrawtransaction.o \
     obj/script.o \
     obj/scrypt.o \
+    obj/scrypt-sse2.o \
     obj/sync.o \
     obj/util.o \
     obj/wallet.o \
@@ -125,9 +127,6 @@ all: elacoind
 # auto-generated dependencies:
 -include obj/*.P
 -include obj-test/*.P
-
-obj/scrypt.o: scrypt.c
-	gcc -c -o $@ $^
 
 obj/build.h: FORCE
 	/bin/sh ../share/genbuild.sh obj/build.h

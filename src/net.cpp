@@ -140,7 +140,7 @@ CAddress GetLocalAddress(const CNetAddr *paddrPeer)
 bool RecvLine(SOCKET hSocket, string& strLine)
 {
     strLine = "";
-    loop
+    ccloop
     {
         char c;
         int nBytes = recv(hSocket, &c, 1, 0);
@@ -313,7 +313,7 @@ bool GetMyExternalIP2(const CService& addrConnect, const char* pszGet, const cha
     {
         if (strLine.empty()) // HTTP response is separated from headers by blank line
         {
-            loop
+            ccloop
             {
                 if (!RecvLine(hSocket, strLine))
                 {
@@ -666,7 +666,7 @@ void ThreadSocketHandler2(void* parg)
     list<CNode*> vNodesDisconnected;
     unsigned int nPrevNodeCount = 0;
 
-    loop
+    ccloop
     {
         //
         // Disconnect nodes
@@ -1078,7 +1078,7 @@ void ThreadMapPort2(void* parg)
         else
             printf("UPnP Port Mapping successful.\n");
         int i = 1;
-        loop {
+        ccloop {
             if (fShutdown || !fUseUPnP)
             {
                 r = UPNP_DeletePortMapping(urls.controlURL, data.first.servicetype, port, "TCP", 0);
@@ -1113,7 +1113,7 @@ void ThreadMapPort2(void* parg)
         freeUPNPDevlist(devlist); devlist = 0;
         if (r != 0)
             FreeUPNPUrls(&urls);
-        loop {
+        ccloop {
             if (fShutdown || !fUseUPnP)
                 return;
             Sleep(2000);
@@ -1222,10 +1222,27 @@ void ThreadDNSAddressSeed2(void* parg)
 
 
 
-unsigned int pnSeed[] =
+static const char * pnSeed[] =
 {
-    0x2EFDCB71, 0xCC1B3AD6, 0xADA77149,
+    "198.199.86.4",
+    "192.99.37.224"
 };
+
+void AddSeedNodes() {
+    std::vector<CAddress> vAdd;
+    for (unsigned int i = 0; i < ARRAYLEN(pnSeed); i++)
+    {
+        // It'll only connect to one or two seed nodes because once it connects,
+        // it'll get a pile of addresses with newer timestamps.
+        // Seed nodes are given a random 'last seen time' of between one and two
+        // weeks ago.
+        const int64 nOneWeek = 7*24*60*60;
+        CAddress addr(CService(pnSeed[i], GetDefaultPort()));
+        addr.nTime = GetTime()-GetRand(nOneWeek)-nOneWeek;
+        vAdd.push_back(addr);
+    }
+    addrman.Add(vAdd, CNetAddr("127.0.0.1"));
+}
 
 void DumpAddresses()
 {
@@ -1332,10 +1349,14 @@ void ThreadOpenConnections2(void* parg)
             }
         }
     }
+    else
+    {
+        AddSeedNodes();
+    }
 
     // Initiate network connections
     int64 nStart = GetTime();
-    loop
+    ccloop
     {
         ProcessOneShot();
 
@@ -1353,23 +1374,9 @@ void ThreadOpenConnections2(void* parg)
             return;
 
         // Add seed nodes if IRC isn't working
-        if (addrman.size()==0 && (GetTime() - nStart > 60) && !fTestNet)
+        if (addrman.size() < 10 && (GetTime() - nStart > 30) && !fTestNet)
         {
-            std::vector<CAddress> vAdd;
-            for (unsigned int i = 0; i < ARRAYLEN(pnSeed); i++)
-            {
-                // It'll only connect to one or two seed nodes because once it connects,
-                // it'll get a pile of addresses with newer timestamps.
-                // Seed nodes are given a random 'last seen time' of between one and two
-                // weeks ago.
-                const int64 nOneWeek = 7*24*60*60;
-                struct in_addr ip;
-                memcpy(&ip, &pnSeed[i], sizeof(ip));
-                CAddress addr(CService(ip, GetDefaultPort()));
-                addr.nTime = GetTime()-GetRand(nOneWeek)-nOneWeek;
-                vAdd.push_back(addr);
-            }
-            addrman.Add(vAdd, CNetAddr("127.0.0.1"));
+        	AddSeedNodes();
         }
 
         //
@@ -1394,7 +1401,7 @@ void ThreadOpenConnections2(void* parg)
         int64 nANow = GetAdjustedTime();
 
         int nTries = 0;
-        loop
+        ccloop
         {
             // use an nUnkBias between 10 (no outgoing connections) and 90 (8 outgoing connections)
             CAddress addr = addrman.Select(10 + min(nOutbound,8)*10);
@@ -1484,7 +1491,7 @@ void ThreadOpenAddedConnections2(void* parg)
             }
         }
     }
-    loop
+    ccloop
     {
         vector<vector<CService> > vservConnectAddresses = vservAddressesToAdd;
         // Attempt to connect to each IP for each addnode entry until at least one is successful per addnode entry
