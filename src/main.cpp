@@ -40,7 +40,8 @@ CBlockIndex* pindexBest = NULL;
 int64 nTimeBestReceived = 0;
 
 const int64 nChainStartTimeNAdaptive = 1389306217; // Scrypt-N N-Factor start time
-const int64 nHardforkStartTime = 1408060800; // hardfork: switch to Scrypt-N/KGW - August 15th, 2014 00:00:00 GMT.
+const int64 nHardforkStartTime = 1411185600; // hardfork: switch to Scrypt-N/KGW - September 20th, 2014 00:00:00 GMT.
+
 
 CMedianFilter<int> cPeerBlockCounts(5, 0); // Amount of blocks that other nodes claim to have
 
